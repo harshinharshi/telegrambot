@@ -13,7 +13,7 @@ A Telegram bot that helps users track their expenses and income through natural 
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone [<repository-url>](https://github.com/harshinharshi/telegrambot.git)
 cd telegrambot
 ```
 
