@@ -4,6 +4,7 @@ import asyncio
 import signal
 import traceback
 import platform
+import ast
 from typing import Optional
 from telegram import Update
 from telegram.ext import (
@@ -17,6 +18,9 @@ from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.schema import StrOutputParser
 from langchain.schema.runnable import RunnablePassthrough
+from excel import append_to_excel
+from datetime import datetime
+from prompt import SYSTEM_PROMPT
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -35,26 +39,28 @@ logger = logging.getLogger(__name__)
 
 # Initialize OpenAI
 llm = ChatOpenAI(
-    temperature=0.7,
+    temperature=0.1,
     model_name="gpt-3.5-turbo"
 )
 
 # Define the prompt template
-template = """You are a helpful AI assistant. Please provide a detailed and helpful response to the following question:
+template = """System: {system_prompt}
 
-Question: {question}
-
-Response:"""
+Question: {question}"""
 
 prompt = ChatPromptTemplate.from_template(template)
 
 # Create the chain
 chain = (
-    {"question": RunnablePassthrough()}
+    {
+        "system_prompt": lambda _: SYSTEM_PROMPT,
+        "question": RunnablePassthrough()
+    }
     | prompt
     | llm
     | StrOutputParser()
 )
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a welcome message when the command /start is issued."""
@@ -63,6 +69,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f'Hi {user.mention_markdown_v2()}\! I\'m an AI\-powered assistant\. '
         f'Ask me anything and I\'ll do my best to help\!'
     )
+
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send help information when the command /help is issued."""
@@ -74,6 +81,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "• Use /help to see this message again"
     )
     await update.message.reply_text(help_text)
+
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle user messages and generate AI responses."""
@@ -88,6 +96,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         # Generate response
         response = chain.invoke(user_message)
+        response_dict = ast.literal_eval(response)
+        excel_entry = {'date': datetime.now().strftime('%Y-%m-%d'), **response_dict}
+        append_to_excel(excel_entry)
         await update.message.reply_text(response)
         
     except Exception as e:
@@ -98,6 +109,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             "Please try again in a moment."
         )
 
+
 async def error_handler(update: Optional[Update], context: ContextTypes.DEFAULT_TYPE) -> None:
     """Log errors caused by updates."""
     logger.error(f"Update {update} caused error: {context.error}")
@@ -105,6 +117,7 @@ async def error_handler(update: Optional[Update], context: ContextTypes.DEFAULT_
         await update.effective_message.reply_text(
             "I apologize, but something went wrong. Please try again later."
         )
+
 
 async def main() -> None:
     """Start the bot."""
@@ -119,7 +132,9 @@ async def main() -> None:
     # Add handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
+    )
     application.add_error_handler(error_handler)
 
     # Set up shutdown handling
@@ -139,7 +154,9 @@ async def main() -> None:
         logger.info("Starting bot...")
         await application.initialize()
         await application.start()
-        await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+        await application.updater.start_polling(
+            allowed_updates=Update.ALL_TYPES
+        )
         logger.info("Bot is running!")
         
         # Wait for stop signal
