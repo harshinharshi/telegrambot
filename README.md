@@ -40,7 +40,7 @@ python bot.py
 ```
 6. Telegram
 
-1. Open Telegram and search for [@Test12091998Bot](https://t.me/Test12091998Bot)
+1. Open Telegram and search for your Bot ID
 2. Start a chat with the bot
 3. Send your expense or income messages directly to the bot
 eg: spent, 200, in Zudo clothing
